@@ -28,6 +28,16 @@ export function initDb() {
       )
     `);
 
+    // Users table (for auth)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+
     // Migrations for existing databases created before link/notes existed:
     // If the column already exists, SQLite will throw an error; we ignore that error.
     db.run(`ALTER TABLE internships ADD COLUMN link TEXT`, (err) => {
