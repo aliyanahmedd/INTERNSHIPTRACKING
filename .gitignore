@@ -1,13 +1,37 @@
-# dependencies
-node_modules/
+# ---- Node / JS ----
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
 
-# environment variables (secrets)
-.env
-
-# logs
+# ---- Logs ----
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# OS / editor files
+# ---- Environment files (secrets) ----
+**/.env
+**/.env.*
+!.env.example
+
+# ---- OS / Editor ----
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
 .vscode/
+.idea/
+
+# ---- SQLite / local database files ----
+backend/data.db
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- Test coverage ----
+coverage/

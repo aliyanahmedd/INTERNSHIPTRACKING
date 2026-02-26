@@ -52,7 +52,6 @@ app.post("/internships", (req, res) => {
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
 
-      // "this.lastID" is provided by sqlite3 for INSERT statements
       res.status(201).json({
         id: this.lastID,
         company,
@@ -62,6 +61,49 @@ app.post("/internships", (req, res) => {
       });
     }
   );
+});
+
+/**
+ * PUT /internships/:id
+ * Body: { company, role, status }
+ * Updates an internship (full edit).
+ */
+app.put("/internships/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const { company, role, status } = req.body;
+
+  const allowed = ["applied", "interviewing", "offer", "rejected"];
+  if (!company || !role || !allowed.includes(status)) {
+    return res.status(400).json({
+      error: "company, role, and a valid status are required",
+    });
+  }
+
+  db.run(
+    "UPDATE internships SET company = ?, role = ?, status = ? WHERE id = ?",
+    [company, role, status, id],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (this.changes === 0) return res.status(404).json({ error: "Not found" });
+
+      res.json({ ok: true });
+    }
+  );
+});
+
+/**
+ * DELETE /internships/:id
+ * Deletes an internship by id.
+ */
+app.delete("/internships/:id", (req, res) => {
+  const id = Number(req.params.id);
+
+  db.run("DELETE FROM internships WHERE id = ?", [id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: "Not found" });
+
+    res.json({ ok: true });
+  });
 });
 
 const PORT = process.env.PORT || 5000;
