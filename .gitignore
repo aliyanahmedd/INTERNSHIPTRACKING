@@ -35,3 +35,4 @@ backend/*.sqlite3
 
 # ---- Test coverage ----
 coverage/
+backend/.env
