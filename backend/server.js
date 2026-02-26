@@ -9,6 +9,81 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+// Auth helpers
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+
+if (!JWT_SECRET) {
+  console.warn("WARNING: JWT_SECRET is not set. Set it in backend/.env");
+}
+
+function signToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+/**
+ * POST /auth/signup
+ * Body: { username, password }
+ */
+app.post("/auth/signup", (req, res) => {
+  const { username, password } = req.body;
+
+  const u = (username || "").trim();
+  const p = password || "";
+
+  if (u.length < 3) return res.status(400).json({ error: "username must be at least 3 characters" });
+  if (p.length < 6) return res.status(400).json({ error: "password must be at least 6 characters" });
+
+  const password_hash = bcrypt.hashSync(p, 10);
+
+  db.run(
+    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+    [u, password_hash],
+    function (err) {
+      if (err) {
+        if (err.message.includes("UNIQUE")) {
+          return res.status(409).json({ error: "username already exists" });
+        }
+        return res.status(500).json({ error: err.message });
+      }
+
+      const token = signToken({ sub: this.lastID, username: u });
+      res.status(201).json({ token, username: u });
+    }
+  );
+});
+
+/**
+ * POST /auth/login
+ * Body: { username, password }
+ */
+app.post("/auth/login", (req, res) => {
+  const { username, password } = req.body;
+
+  const u = (username || "").trim();
+  const p = password || "";
+
+  if (!u || !p) return res.status(400).json({ error: "username and password are required" });
+
+  db.get(
+    "SELECT id, username, password_hash FROM users WHERE username = ?",
+    [u],
+    (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!row) return res.status(401).json({ error: "invalid credentials" });
+
+      const ok = bcrypt.compareSync(p, row.password_hash);
+      if (!ok) return res.status(401).json({ error: "invalid credentials" });
+
+      const token = signToken({ sub: row.id, username: row.username });
+      res.json({ token, username: row.username });
+    }
+  );
+});
+
 // Initialize DB table(s) at startup (and run migrations)
 initDb();
 
