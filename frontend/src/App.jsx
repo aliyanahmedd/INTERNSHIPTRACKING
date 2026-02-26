@@ -1,47 +1,168 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-export default function App() {
-  // health holds the JSON response from the backend
-  const [health, setHealth] = useState(null);
+const API_BASE = "http://localhost:5000";
 
-  // error holds any error message if the request fails
+export default function App() {
+  const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
+  const [status, setStatus] = useState("applied");
+
+  const [internships, setInternships] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  async function loadInternships() {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/internships`);
+      if (!res.ok) throw new Error(`Failed to load: ${res.status}`);
+      const data = await res.json();
+      setInternships(data);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    // useEffect runs after the component renders.
-    // The empty [] means "run only once on page load".
-    fetch("http://localhost:5000/health")
-      .then((res) => {
-        // res is the raw HTTP response object.
-        // res.json() converts the response body into a JS object.
-        return res.json();
-      })
-      .then((data) => {
-        // data is the parsed JSON from the backend.
-        // Saving it into state triggers a re-render.
-        setHealth(data);
-      })
-      .catch((err) => {
-        // If the network request fails (backend down, CORS blocked, etc.)
-        setError(String(err));
-      });
+    loadInternships();
   }, []);
 
+  async function onSubmit(e) {
+    e.preventDefault();
+    setError(null);
+
+    if (!company.trim() || !role.trim()) {
+      setError("Company and role are required.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/internships`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: company.trim(),
+          role: role.trim(),
+          status,
+        }),
+      });
+
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Create failed: ${res.status} ${msg}`);
+      }
+
+      setCompany("");
+      setRole("");
+      setStatus("applied");
+      await loadInternships();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui, Arial" }}>
-      <h1>Internship Tracking</h1>
+    <div className="appShell">
+      <div className="page">
+        <header className="header">
+          <div>
+            <h1 className="title">Internship Tracking</h1>
+            <p className="subtitle">
+              Track applications, interviews, offers, and results in one place.
+            </p>
+          </div>
 
-      <h2>Backend health check</h2>
+          <div className="pill">
+            <span className="pillDot" />
+            Backend: <span className="pillText">connected</span>
+          </div>
+        </header>
 
-      {/* If there is an error, show it */}
-      {error && <pre style={{ color: "crimson" }}>{error}</pre>}
+        <main className="grid">
+          <section className="card">
+            <h2 className="cardTitle">Add internship</h2>
 
-      {/* If no error and health not loaded yet, show loading */}
-      {!error && !health && <p>Loading...</p>}
+            <form onSubmit={onSubmit} className="form">
+              <div className="field">
+                <label className="label">Company</label>
+                <input
+                  className="input"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="e.g. Google"
+                />
+              </div>
 
-      {/* If health is loaded, show it formatted */}
-      {health && <pre>{JSON.stringify(health, null, 2)}</pre>}
+              <div className="field">
+                <label className="label">Role</label>
+                <input
+                  className="input"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="e.g. Software Engineering Intern"
+                />
+              </div>
+
+              <div className="field">
+                <label className="label">Status</label>
+                <select
+                  className="select"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="applied">applied</option>
+                  <option value="interviewing">interviewing</option>
+                  <option value="offer">offer</option>
+                  <option value="rejected">rejected</option>
+                </select>
+              </div>
+
+              <button className="button" type="submit">
+                Add
+              </button>
+
+              {error && <div className="alert">{error}</div>}
+            </form>
+          </section>
+
+          <section className="card">
+            <div className="listHeader">
+              <h2 className="cardTitle">Your internships</h2>
+              <div className="count">{internships.length}</div>
+            </div>
+
+            {loading && <p className="muted">Loading...</p>}
+            {!loading && internships.length === 0 && (
+              <p className="muted">No internships yet. Add one above.</p>
+            )}
+
+            <div className="list">
+              {internships.map((it) => (
+                <div key={it.id} className="item">
+                  <div className="itemTop">
+                    <div className="itemMain">
+                      <div className="itemCompany">{it.company}</div>
+                      <div className="itemRole">{it.role}</div>
+                    </div>
+
+                    <span className={`badge badge--${it.status}`}>
+                      {it.status}
+                    </span>
+                  </div>
+
+                  <div className="itemMeta">
+                    Created: {new Date(it.created_at).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
   );
 }
