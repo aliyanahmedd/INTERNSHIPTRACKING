@@ -59,6 +59,28 @@ body {
   backdrop-filter: blur(12px);
 }
 
+/* Optional: make auth page width nicer on large screens */
+.page--auth {
+  width: min(760px, 100%);
+}
+
+/* ---- Auth page spacing helpers ---- */
+.authHeader {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.authCard {
+  padding: 20px; /* more breathing room for auth screens */
+}
+
+.formActions {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
 .header {
   display: flex;
   align-items: flex-start;
@@ -127,14 +149,15 @@ body {
   letter-spacing: -0.2px;
 }
 
+/* Improve vertical rhythm of forms globally */
 .form {
   display: grid;
-  gap: 12px;
+  gap: 14px; /* was 12px */
 }
 
 .field {
   display: grid;
-  gap: 6px;
+  gap: 8px; /* was 6px */
 }
 
 .label {
@@ -176,7 +199,7 @@ body {
 }
 
 .button {
-  margin-top: 6px;
+  margin-top: 0; /* was 6px */
   padding: 11px 12px;
   border-radius: 12px;
   border: none;
@@ -197,6 +220,7 @@ body {
 }
 
 .buttonSecondary {
+  margin-top: 0;
   padding: 11px 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.18);

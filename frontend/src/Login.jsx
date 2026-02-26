@@ -60,15 +60,17 @@ export default function Login() {
 
   return (
     <div className="appShell">
-      <div className="page">
-        <h1 className="title">{mode === "login" ? "Login" : "Sign up"}</h1>
-        <p className="subtitle">
-          {mode === "login"
-            ? "Log in to access your internship tracker."
-            : "Create an account to start tracking internships."}
-        </p>
+      <div className="page page--auth">
+        <div className="authHeader">
+          <h1 className="title">{mode === "login" ? "Login" : "Sign up"}</h1>
+          <p className="subtitle">
+            {mode === "login"
+              ? "Log in to access your internship tracker."
+              : "Create an account to start tracking internships."}
+          </p>
+        </div>
 
-        <div className="card">
+        <div className="card authCard">
           <form className="form" onSubmit={submit}>
             <div className="field">
               <label className="label">Username</label>
@@ -109,23 +111,23 @@ export default function Login() {
 
             {error && <div className="alert">{error}</div>}
 
-            <button className="button" type="submit" disabled={loading}>
-              {loading ? "Please wait..." : mode === "login" ? "Login" : "Create account"}
-            </button>
+            <div className="formActions">
+              <button className="button" type="submit" disabled={loading}>
+                {loading ? "Please wait..." : mode === "login" ? "Login" : "Create account"}
+              </button>
 
-            <button
-              type="button"
-              className="buttonSecondary"
-              disabled={loading}
-              onClick={() => {
-                setError(null);
-                setMode((m) => (m === "login" ? "signup" : "login"));
-              }}
-            >
-              {mode === "login"
-                ? "Need an account? Sign up"
-                : "Already have an account? Login"}
-            </button>
+              <button
+                type="button"
+                className="buttonSecondary"
+                disabled={loading}
+                onClick={() => {
+                  setError(null);
+                  setMode((m) => (m === "login" ? "signup" : "login"));
+                }}
+              >
+                {mode === "login" ? "Need an account? Sign up" : "Already have an account? Login"}
+              </button>
+            </div>
           </form>
         </div>
       </div>
