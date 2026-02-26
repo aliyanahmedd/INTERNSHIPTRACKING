@@ -35,19 +35,45 @@ export default function Tracker() {
   const [editError, setEditError] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
 
-  // Step C: logout button
   const navigate = useNavigate();
+
+  function getToken() {
+    return localStorage.getItem("it_token");
+  }
+
   function logout() {
+    localStorage.removeItem("it_token");
     localStorage.removeItem("it_username");
     localStorage.removeItem("it_mode");
     navigate("/login");
+  }
+
+  async function authedFetch(url, options = {}) {
+    const token = getToken();
+    if (!token) {
+      // Not logged in anymore (or token missing)
+      logout();
+      throw new Error("Not authenticated");
+    }
+
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    };
+
+    // If we are sending JSON, keep content-type
+    return fetch(url, { ...options, headers });
   }
 
   async function loadInternships() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/internships`);
+      const res = await authedFetch(`${API_BASE}/internships`);
+      if (res.status === 401) {
+        logout();
+        return;
+      }
       if (!res.ok) throw new Error(`Failed to load: ${res.status}`);
       const data = await res.json();
       setInternships(data);
@@ -59,7 +85,13 @@ export default function Tracker() {
   }
 
   useEffect(() => {
+    // If user refreshes without a token, send them to login
+    if (!getToken()) {
+      navigate("/login");
+      return;
+    }
     loadInternships();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onSubmit(e) {
@@ -72,7 +104,7 @@ export default function Tracker() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/internships`, {
+      const res = await authedFetch(`${API_BASE}/internships`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -83,6 +115,11 @@ export default function Tracker() {
           notes: notes.trim() || null,
         }),
       });
+
+      if (res.status === 401) {
+        logout();
+        return;
+      }
 
       if (!res.ok) {
         const msg = await res.text();
@@ -133,7 +170,7 @@ export default function Tracker() {
 
     setEditSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/internships/${editId}`, {
+      const res = await authedFetch(`${API_BASE}/internships/${editId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -144,6 +181,11 @@ export default function Tracker() {
           notes: editNotes.trim() || null,
         }),
       });
+
+      if (res.status === 401) {
+        logout();
+        return;
+      }
 
       if (!res.ok) {
         const msg = await res.text();
@@ -163,7 +205,13 @@ export default function Tracker() {
 
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/internships/${id}`, { method: "DELETE" });
+      const res = await authedFetch(`${API_BASE}/internships/${id}`, { method: "DELETE" });
+
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+
       if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Delete failed: ${res.status} ${msg}`);
@@ -183,7 +231,7 @@ export default function Tracker() {
     }
   }
 
-  // Step B: apply search + status filter
+  // apply search + status filter
   const visibleInternships = internships.filter((it) => {
     const q = query.trim().toLowerCase();
     const matchesQuery =
@@ -296,11 +344,7 @@ export default function Tracker() {
                 placeholder="Search company or role..."
               />
 
-              <select
-                className="select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
+              <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="all">all</option>
                 <option value="applied">applied</option>
                 <option value="interviewing">interviewing</option>
@@ -310,9 +354,7 @@ export default function Tracker() {
             </div>
 
             {loading && <p className="muted">Loading...</p>}
-            {!loading && visibleInternships.length === 0 && (
-              <p className="muted">No results. Try changing search/filter.</p>
-            )}
+            {!loading && visibleInternships.length === 0 && <p className="muted">No results. Try changing search/filter.</p>}
 
             <div className="list">
               {visibleInternships.map((it) => (
@@ -360,7 +402,6 @@ export default function Tracker() {
         </main>
       </div>
 
-      {/* Modal */}
       {isEditOpen && (
         <div className="modalOverlay" onMouseDown={closeEdit}>
           <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
@@ -400,12 +441,7 @@ export default function Tracker() {
 
               <div className="field">
                 <label className="label">Notes (optional)</label>
-                <textarea
-                  className="textarea"
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  rows={4}
-                />
+                <textarea className="textarea" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={4} />
               </div>
 
               {editError && <div className="alert">{editError}</div>}

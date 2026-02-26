@@ -24,7 +24,8 @@ export function initDb() {
         status TEXT NOT NULL DEFAULT 'applied',
         link TEXT,
         notes TEXT,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        user_id INTEGER
       )
     `);
 
@@ -38,7 +39,7 @@ export function initDb() {
       )
     `);
 
-    // Migrations for existing databases created before link/notes existed:
+    // Migrations for existing databases created before link/notes/user_id existed:
     // If the column already exists, SQLite will throw an error; we ignore that error.
     db.run(`ALTER TABLE internships ADD COLUMN link TEXT`, (err) => {
       if (err) {
@@ -49,6 +50,20 @@ export function initDb() {
     db.run(`ALTER TABLE internships ADD COLUMN notes TEXT`, (err) => {
       if (err) {
         // Ignore duplicate column name errors.
+      }
+    });
+
+    // Add user_id so internships belong to a specific user
+    db.run(`ALTER TABLE internships ADD COLUMN user_id INTEGER`, (err) => {
+      if (err) {
+        // Ignore duplicate column name errors.
+      }
+    });
+
+    // Backfill existing rows to the first user (so old data doesn't disappear)
+    db.run(`UPDATE internships SET user_id = 1 WHERE user_id IS NULL`, (err) => {
+      if (err) {
+        // Ignore errors; if it fails you'll see it in testing.
       }
     });
   });

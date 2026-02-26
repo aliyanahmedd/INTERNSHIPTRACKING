@@ -1,16 +1,17 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+
 import { db, initDb } from "./db.js";
+
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 
 // Auth helpers
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -22,6 +23,23 @@ if (!JWT_SECRET) {
 
 function signToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+function requireAuth(req, res, next) {
+  try {
+    const header = req.headers.authorization || "";
+    const [type, token] = header.split(" ");
+
+    if (type !== "Bearer" || !token) {
+      return res.status(401).json({ error: "Missing or invalid Authorization header" });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = { id: decoded.sub, username: decoded.username };
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
 }
 
 /**
@@ -84,21 +102,14 @@ app.post("/auth/login", (req, res) => {
   );
 });
 
-// Initialize DB table(s) at startup (and run migrations)
-initDb();
-
-app.get("/health", (req, res) => {
-  res.json({ ok: true, date: new Date().toISOString() });
-});
-
 /**
- * GET /internships
- * Returns all internships (newest first).
+ * GET /internships (auth required)
+ * Returns only internships belonging to the logged-in user.
  */
-app.get("/internships", (req, res) => {
+app.get("/internships", requireAuth, (req, res) => {
   db.all(
-    "SELECT id, company, role, status, link, notes, created_at FROM internships ORDER BY id DESC",
-    [],
+    "SELECT id, company, role, status, link, notes, created_at FROM internships WHERE user_id = ? ORDER BY id DESC",
+    [req.user.id],
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(rows);
@@ -107,11 +118,9 @@ app.get("/internships", (req, res) => {
 });
 
 /**
- * POST /internships
- * Body: { company, role, status?, link?, notes? }
- * Creates a new internship record.
+ * POST /internships (auth required)
  */
-app.post("/internships", (req, res) => {
+app.post("/internships", requireAuth, (req, res) => {
   const { company, role, status, link, notes } = req.body;
 
   if (!company || !role) {
@@ -124,8 +133,8 @@ app.post("/internships", (req, res) => {
   const finalNotes = notes?.trim() || null;
 
   db.run(
-    "INSERT INTO internships (company, role, status, link, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [company, role, finalStatus, finalLink, finalNotes, createdAt],
+    "INSERT INTO internships (company, role, status, link, notes, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [company, role, finalStatus, finalLink, finalNotes, createdAt, req.user.id],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
 
@@ -143,11 +152,9 @@ app.post("/internships", (req, res) => {
 });
 
 /**
- * PUT /internships/:id
- * Body: { company, role, status, link?, notes? }
- * Updates an internship (full edit).
+ * PUT /internships/:id (auth required)
  */
-app.put("/internships/:id", (req, res) => {
+app.put("/internships/:id", requireAuth, (req, res) => {
   const id = Number(req.params.id);
   const { company, role, status, link, notes } = req.body;
 
@@ -162,8 +169,8 @@ app.put("/internships/:id", (req, res) => {
   const finalNotes = notes?.trim() || null;
 
   db.run(
-    "UPDATE internships SET company = ?, role = ?, status = ?, link = ?, notes = ? WHERE id = ?",
-    [company, role, status, finalLink, finalNotes, id],
+    "UPDATE internships SET company = ?, role = ?, status = ?, link = ?, notes = ? WHERE id = ? AND user_id = ?",
+    [company, role, status, finalLink, finalNotes, id, req.user.id],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
       if (this.changes === 0) return res.status(404).json({ error: "Not found" });
@@ -174,19 +181,24 @@ app.put("/internships/:id", (req, res) => {
 });
 
 /**
- * DELETE /internships/:id
- * Deletes an internship by id.
+ * DELETE /internships/:id (auth required)
  */
-app.delete("/internships/:id", (req, res) => {
+app.delete("/internships/:id", requireAuth, (req, res) => {
   const id = Number(req.params.id);
 
-  db.run("DELETE FROM internships WHERE id = ?", [id], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: "Not found" });
+  db.run(
+    "DELETE FROM internships WHERE id = ? AND user_id = ?",
+    [id, req.user.id],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      if (this.changes === 0) return res.status(404).json({ error: "Not found" });
 
-    res.json({ ok: true });
-  });
+      res.json({ ok: true });
+    }
+  );
 });
+
+initDb();
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
