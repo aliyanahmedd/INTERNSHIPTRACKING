@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize DB table(s) at startup
+// Initialize DB table(s) at startup (and run migrations)
 initDb();
 
 app.get("/health", (req, res) => {
@@ -22,7 +22,7 @@ app.get("/health", (req, res) => {
  */
 app.get("/internships", (req, res) => {
   db.all(
-    "SELECT id, company, role, status, created_at FROM internships ORDER BY id DESC",
+    "SELECT id, company, role, status, link, notes, created_at FROM internships ORDER BY id DESC",
     [],
     (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -33,11 +33,11 @@ app.get("/internships", (req, res) => {
 
 /**
  * POST /internships
- * Body: { company, role, status? }
+ * Body: { company, role, status?, link?, notes? }
  * Creates a new internship record.
  */
 app.post("/internships", (req, res) => {
-  const { company, role, status } = req.body;
+  const { company, role, status, link, notes } = req.body;
 
   if (!company || !role) {
     return res.status(400).json({ error: "company and role are required" });
@@ -45,10 +45,12 @@ app.post("/internships", (req, res) => {
 
   const createdAt = new Date().toISOString();
   const finalStatus = status || "applied";
+  const finalLink = link?.trim() || null;
+  const finalNotes = notes?.trim() || null;
 
   db.run(
-    "INSERT INTO internships (company, role, status, created_at) VALUES (?, ?, ?, ?)",
-    [company, role, finalStatus, createdAt],
+    "INSERT INTO internships (company, role, status, link, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [company, role, finalStatus, finalLink, finalNotes, createdAt],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
 
@@ -57,6 +59,8 @@ app.post("/internships", (req, res) => {
         company,
         role,
         status: finalStatus,
+        link: finalLink,
+        notes: finalNotes,
         created_at: createdAt,
       });
     }
@@ -65,12 +69,12 @@ app.post("/internships", (req, res) => {
 
 /**
  * PUT /internships/:id
- * Body: { company, role, status }
+ * Body: { company, role, status, link?, notes? }
  * Updates an internship (full edit).
  */
 app.put("/internships/:id", (req, res) => {
   const id = Number(req.params.id);
-  const { company, role, status } = req.body;
+  const { company, role, status, link, notes } = req.body;
 
   const allowed = ["applied", "interviewing", "offer", "rejected"];
   if (!company || !role || !allowed.includes(status)) {
@@ -79,9 +83,12 @@ app.put("/internships/:id", (req, res) => {
     });
   }
 
+  const finalLink = link?.trim() || null;
+  const finalNotes = notes?.trim() || null;
+
   db.run(
-    "UPDATE internships SET company = ?, role = ?, status = ? WHERE id = ?",
-    [company, role, status, id],
+    "UPDATE internships SET company = ?, role = ?, status = ?, link = ?, notes = ? WHERE id = ?",
+    [company, role, status, finalLink, finalNotes, id],
     function (err) {
       if (err) return res.status(500).json({ error: err.message });
       if (this.changes === 0) return res.status(404).json({ error: "Not found" });
